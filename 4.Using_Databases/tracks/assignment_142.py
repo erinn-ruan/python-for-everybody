@@ -85,7 +85,7 @@ for entry in all:
         VALUES ( ? )''', ( genre, ) )
     cur.execute('SELECT id FROM Genre WHERE name = ? ', (genre, ))
     genre_id = cur.fetchone()[0]
-    print(genre_id)
+    
     cur.execute('''INSERT OR IGNORE INTO Album (title, artist_id) 
         VALUES ( ?, ? )''', ( album, artist_id ) )
     cur.execute('SELECT id FROM Album WHERE title = ? ', (album, ))

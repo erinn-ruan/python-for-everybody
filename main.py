@@ -1,48 +1,34 @@
-import urllib.request, urllib.parse, urllib.error
-import json
-import ssl
+import sqlite3
 
-api_key = False
-# If you have a Google Places API key, enter it here
-# api_key = 'AIzaSy___IDByT70'
-# https://developers.google.com/maps/documentation/geocoding/intro
+conn = sqlite3.connect('emaildb.sqlite')
+cur = conn.cursor()
 
-if api_key is False:
-    api_key = 42
-    serviceurl = 'http://py4e-data.dr-chuck.net/json?'
-else :
-    serviceurl = 'https://maps.googleapis.com/maps/api/geocode/json?'
+cur.execute('DROP TABLE IF EXISTS Counts')
 
-# Ignore SSL certificate errors
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
+cur.execute('''
+CREATE TABLE Counts (org TEXT, count INTEGER)''')
 
-while True:
-    address = input('Enter location: ')
-    if len(address) < 1: break
+fname = input('Enter file name: ')
+if (len(fname) < 1): fname = 'mbox-short.txt'
+fh = open(fname)
+for line in fh:
+    if not line.startswith('From: '): continue
+    pieces = line.split()
+    email = pieces[1]
+    cur.execute('SELECT count FROM Counts WHERE org = ? ', (email,))
+    row = cur.fetchone()
+    if row is None:
+        cur.execute('''INSERT INTO Counts (org, count)
+                VALUES (?, 1)''', (email,))
+    else:
+        cur.execute('UPDATE Counts SET count = count + 1 WHERE org = ?',
+                    (email,))
+    conn.commit()
 
-    parms = dict()
-    parms['address'] = address
-    if api_key is not False: parms['key'] = api_key
-    url = serviceurl + urllib.parse.urlencode(parms)
+# https://www.sqlite.org/lang_select.html
+sqlstr = 'SELECT email, count FROM Counts ORDER BY count DESC LIMIT 10'
 
-    print('Retrieving', url)
-    uh = urllib.request.urlopen(url, context=ctx)
-    data = uh.read().decode()
-    print('Retrieved', len(data), 'characters')
+for row in cur.execute(sqlstr):
+    print(str(row[0]), row[1])
 
-    try:
-        js = json.loads(data)
-    except:
-        js = None
-
-    if not js or 'status' not in js or js['status'] != 'OK':
-        print('==== Failure To Retrieve ====')
-        print(data)
-        continue
-
-    #print(json.dumps(js, indent=4))
-
-    placeid = js['results'][0]['place_id']
-    print(placeid)
+cur.close()
